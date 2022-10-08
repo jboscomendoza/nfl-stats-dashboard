@@ -9,26 +9,29 @@ COLOR_CUSTOM = ["#00cccc"]
 
 nfl_stats = pd.read_parquet("nfl_scores.parquet")
 nfl_stats = nfl_stats.dropna()
-nfl_stats["schedule_season"] = nfl_stats["schedule_season"].astype("int").astype("str")
-nfl_stats = nfl_stats.sort_values(["team_id", "schedule_season", "schedule_week"]).reset_index(drop=True)
+nfl_stats["season_txt"] = nfl_stats["schedule_season"].astype("int")
+nfl_stats["season_txt"] = nfl_stats["season_txt"].astype("str")
 
 st.header("Filters")
-
-col1, col2 = st.columns(2)
-with col1:
-    team = st.selectbox("Team", nfl_stats.sort_values(["team_id"])["team_id"].unique())
-with col2:
-    slider = st.slider("Decade", min_value=1960, max_value=2020, value= 2020, step=10)
 
 #slider = 2000
 #team = "TEN"
 
-# Filtered data
-nfl_display = nfl_stats.loc[(nfl_stats["team_id"] == team) & (nfl_stats["decade"] == slider)]
+col1, col2 = st.columns(2)
+with col1:
+    team = st.selectbox("Team", nfl_stats.sort_values(["team_id"])["team_id"].unique())
+    nfl_display = nfl_stats.loc[(nfl_stats["team_id"] == team)]
+    min_year = int(nfl_display["schedule_season"].min())
+with col2:
+    slider = st.slider("Season", min_value=min_year, max_value=2020, value= [2011, 2022], step=1)
 
-# Wins
+nfl_display = nfl_display.loc[nfl_display["schedule_season"].between(slider[0], slider[1], inclusive = "both")]
+team_names_list = nfl_display["team"].unique().tolist()
+team_names = ", ".join(team_names_list)
+st.markdown(team_names)
+
+
 st.header("Wins")
-
 total_wins = nfl_display.groupby("status")["victory"].count()
 
 away_wins = str(total_wins[0])
@@ -43,7 +46,10 @@ col2.metric("Away", away_wins)
 st.header("Plots")
 
 ## Cumulative wins plot
-fig_wins = px.line(nfl_display, x="schedule_week", y="cumulative", color="schedule_season",
+nfl_cumulative = nfl_display.groupby("schedule_week", as_index= False)["cumulative"].mean()
+
+
+fig_wins = px.line(nfl_cumulative, x="schedule_week", y="cumulative",
                    color_discrete_sequence=COLOR_SEQ,
                    labels={
                        "schedule_week":"Week",
@@ -102,10 +108,6 @@ st.plotly_chart(fig_prop, use_container_width=True)
 st.plotly_chart(fig_status, use_container_width=True)
 
 
-
-
-
 st.header("Stats")
 
 st.dataframe(nfl_display)
-
